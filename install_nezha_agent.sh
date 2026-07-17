@@ -4,9 +4,7 @@ set -euo pipefail
 
 AGENT_VERSION="${AGENT_VERSION:-v2.2.3}"
 AGENT_DIR="/opt/nezha/agent"
-NZ_SERVER="${NZ_SERVER:-tz.114431.xyz:443}"
 NZ_TLS="${NZ_TLS:-true}"
-NZ_CLIENT_SECRET="${NZ_CLIENT_SECRET:-HynSbwbycKQMaUE6acxXRK5HZGEeZAqu}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -105,6 +103,18 @@ main() {
 
     info "检测系统架构..."
     detect_arch
+
+    if [ -z "${NZ_SERVER:-}" ]; then
+        error "缺少环境变量 NZ_SERVER，请在命令中设置"
+        error "示例: NZ_SERVER=\"server:5555\" NZ_CLIENT_SECRET=\"secret\" curl ... | bash"
+        exit 1
+    fi
+
+    if [ -z "${NZ_CLIENT_SECRET:-}" ]; then
+        error "缺少环境变量 NZ_CLIENT_SECRET，请在命令中设置"
+        error "示例: NZ_SERVER=\"server:5555\" NZ_CLIENT_SECRET=\"secret\" curl ... | bash"
+        exit 1
+    fi
 
     ZIP="/tmp/nezha-agent_linux_${NZ_ARCH}_${AGENT_VERSION}.zip"
     URL="https://github.com/nezhahq/agent/releases/download/${AGENT_VERSION}/nezha-agent_linux_${NZ_ARCH}.zip"
