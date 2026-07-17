@@ -23,28 +23,6 @@ error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-detect_package_manager() {
-    if command -v apt-get >/dev/null 2>&1; then
-        PKG_MANAGER="apt-get"
-        PKG_INSTALL=("install" "-y")
-    elif command -v yum >/dev/null 2>&1; then
-        PKG_MANAGER="yum"
-        PKG_INSTALL=("install" "-y")
-    elif command -v dnf >/dev/null 2>&1; then
-        PKG_MANAGER="dnf"
-        PKG_INSTALL=("install" "-y")
-    elif command -v apk >/dev/null 2>&1; then
-        PKG_MANAGER="apk"
-        PKG_INSTALL=("add")
-    elif command -v zypper >/dev/null 2>&1; then
-        PKG_MANAGER="zypper"
-        PKG_INSTALL=("install" "-y")
-    else
-        error "不支持的包管理器，请手动安装依赖"
-        exit 1
-    fi
-}
-
 install_dependencies() {
     local missing_deps=()
     for dep in "$@"; do
@@ -59,7 +37,21 @@ install_dependencies() {
 
     info "检测到缺少依赖: ${missing_deps[*]}"
     info "正在自动安装依赖..."
-    ${SUDO} "$PKG_MANAGER" "${PKG_INSTALL[@]}" "${missing_deps[@]}"
+
+    if command -v apt-get >/dev/null 2>&1; then
+        ${SUDO} apt-get update && ${SUDO} apt-get install -y "${missing_deps[@]}"
+    elif command -v dnf >/dev/null 2>&1; then
+        ${SUDO} dnf install -y "${missing_deps[@]}"
+    elif command -v yum >/dev/null 2>&1; then
+        ${SUDO} yum install -y "${missing_deps[@]}"
+    elif command -v apk >/dev/null 2>&1; then
+        ${SUDO} apk add --no-cache "${missing_deps[@]}"
+    elif command -v zypper >/dev/null 2>&1; then
+        ${SUDO} zypper install -y "${missing_deps[@]}"
+    else
+        error "不支持的包管理器，请手动安装依赖"
+        exit 1
+    fi
 }
 
 get_sudo() {
@@ -94,9 +86,6 @@ main() {
 
     info "获取权限..."
     get_sudo
-
-    info "检测包管理器..."
-    detect_package_manager
 
     info "检查并安装依赖..."
     install_dependencies "curl" "unzip"
