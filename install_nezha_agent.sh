@@ -23,14 +23,43 @@ error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-check_dependencies() {
-    local deps=("curl" "unzip")
-    for dep in "${deps[@]}"; do
+detect_package_manager() {
+    if command -v apt-get >/dev/null 2>&1; then
+        PKG_MANAGER="apt-get"
+        PKG_INSTALL="install -y"
+    elif command -v yum >/dev/null 2>&1; then
+        PKG_MANAGER="yum"
+        PKG_INSTALL="install -y"
+    elif command -v dnf >/dev/null 2>&1; then
+        PKG_MANAGER="dnf"
+        PKG_INSTALL="install -y"
+    elif command -v apk >/dev/null 2>&1; then
+        PKG_MANAGER="apk"
+        PKG_INSTALL="add"
+    elif command -v zypper >/dev/null 2>&1; then
+        PKG_MANAGER="zypper"
+        PKG_INSTALL="install -y"
+    else
+        error "不支持的包管理器，请手动安装依赖"
+        exit 1
+    fi
+}
+
+install_dependencies() {
+    local missing_deps=()
+    for dep in "$@"; do
         if ! command -v "$dep" >/dev/null 2>&1; then
-            error "缺少依赖: $dep"
-            exit 1
+            missing_deps+=("$dep")
         fi
     done
+
+    if [ ${#missing_deps[@]} -eq 0 ]; then
+        return
+    fi
+
+    info "检测到缺少依赖: ${missing_deps[*]}"
+    info "正在自动安装依赖..."
+    ${SUDO} "$PKG_MANAGER" "$PKG_INSTALL" "${missing_deps[@]}"
 }
 
 get_sudo() {
@@ -62,11 +91,14 @@ main() {
     echo "      版本: ${AGENT_VERSION}"
     echo "========================================="
 
-    info "检查依赖..."
-    check_dependencies
-
     info "获取权限..."
     get_sudo
+
+    info "检测包管理器..."
+    detect_package_manager
+
+    info "检查并安装依赖..."
+    install_dependencies "curl" "unzip"
 
     info "检测系统架构..."
     detect_arch
