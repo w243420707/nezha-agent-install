@@ -2,9 +2,11 @@
 
 set -euo pipefail
 
-AGENT_VERSION="0.20.12"
-AGENT_DIR="/opt/nezha-agent"
-ZIP="/tmp/nezha-agent.zip"
+AGENT_VERSION="${AGENT_VERSION:-v2.2.3}"
+AGENT_DIR="/opt/nezha/agent"
+NZ_SERVER="${NZ_SERVER:-tz.114431.xyz:443}"
+NZ_TLS="${NZ_TLS:-true}"
+NZ_CLIENT_SECRET="${NZ_CLIENT_SECRET:-HynSbwbycKQMaUE6acxXRK5HZGEeZAqu}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -75,9 +77,10 @@ get_sudo() {
 
 detect_arch() {
     case "$(uname -m)" in
-        x86_64) ARCH="amd64" ;;
-        aarch64|arm64) ARCH="arm64" ;;
-        armv7l) ARCH="armv7" ;;
+        x86_64|amd64) NZ_ARCH="amd64" ;;
+        aarch64|arm64) NZ_ARCH="arm64" ;;
+        i386|i686) NZ_ARCH="386" ;;
+        armv7l|armv6l|arm) NZ_ARCH="arm" ;;
         *) 
             error "不支持的架构: $(uname -m)"
             exit 1
@@ -103,37 +106,16 @@ main() {
     info "检测系统架构..."
     detect_arch
 
-    if [ -z "${NZ_SERVER:-}" ]; then
-        read -p "请输入 Nezha 服务端地址 (例如: server.example.com:5555): " NZ_SERVER
-        if [ -z "$NZ_SERVER" ]; then
-            error "服务端地址不能为空"
-            exit 1
-        fi
-    else
-        info "使用环境变量中的服务端地址"
-    fi
+    ZIP="/tmp/nezha-agent_linux_${NZ_ARCH}_${AGENT_VERSION}.zip"
+    URL="https://github.com/nezhahq/agent/releases/download/${AGENT_VERSION}/nezha-agent_linux_${NZ_ARCH}.zip"
 
-    if [ -z "${NZ_CLIENT_SECRET:-}" ]; then
-        read -p "请输入客户端密钥 (Client Secret): " NZ_CLIENT_SECRET
-        if [ -z "$NZ_CLIENT_SECRET" ]; then
-            error "客户端密钥不能为空"
-            exit 1
-        fi
-    else
-        info "使用环境变量中的客户端密钥"
-    fi
-
-    if [ -z "${NZ_TLS:-}" ]; then
-        read -p "是否启用 TLS (true/false，默认 true): " NZ_TLS
-    fi
-    NZ_TLS=${NZ_TLS:-true}
-
-    URL="https://github.com/nezhahq/agent/releases/download/v${AGENT_VERSION}/nezha-agent_${AGENT_VERSION}_linux_${ARCH}.zip"
+    info "使用配置:"
+    info "  版本: ${AGENT_VERSION}"
+    info "  服务端: ${NZ_SERVER}"
+    info "  TLS: ${NZ_TLS}"
 
     echo ""
-    info "开始安装 Nezha Agent ${AGENT_VERSION} (${ARCH})..."
-    info "服务端: ${NZ_SERVER}"
-    info "TLS: ${NZ_TLS}"
+    info "开始安装 Nezha Agent ${AGENT_VERSION} (${NZ_ARCH})..."
 
     info "创建安装目录..."
     ${SUDO} mkdir -p "$AGENT_DIR"
