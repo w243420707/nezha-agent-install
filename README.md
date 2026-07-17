@@ -13,11 +13,21 @@ Nezha Agent (哪吒探针) 一键安装脚本，支持自动检测系统架构�
 
 ## 使用方法
 
+### 方式一：一键命令安装（推荐）
+
+通过环境变量传递参数，无需交互：
+
+```bash
+NZ_SERVER="your-server.example.com:5555" NZ_CLIENT_SECRET="your-secret-key" NZ_TLS="true" curl -fsSL https://raw.githubusercontent.com/w243420707/nezha-agent-install/main/install_nezha_agent.sh | bash
+```
+
+### 方式二：交互式安装
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/w243420707/nezha-agent-install/main/install_nezha_agent.sh | bash
 ```
 
-或者手动下载执行：
+### 方式三：手动下载执行
 
 ```bash
 # 下载脚本
@@ -26,9 +36,20 @@ curl -O https://raw.githubusercontent.com/w243420707/nezha-agent-install/main/in
 # 赋予执行权限
 chmod +x install_nezha_agent.sh
 
-# 运行脚本
+# 环境变量方式运行
+NZ_SERVER="your-server:5555" NZ_CLIENT_SECRET="your-secret" NZ_TLS="true" ./install_nezha_agent.sh
+
+# 或交互式运行
 ./install_nezha_agent.sh
 ```
+
+### 环境变量参数
+
+| 变量名 | 必填 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `NZ_SERVER` | 是 | 无 | Nezha 服务端地址（如: `server.example.com:5555`） |
+| `NZ_CLIENT_SECRET` | 是 | 无 | 客户端密钥 |
+| `NZ_TLS` | 否 | `true` | 是否启用 TLS |
 
 ## 加固配置
 

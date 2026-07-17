@@ -103,20 +103,29 @@ main() {
     info "检测系统架构..."
     detect_arch
 
-    echo ""
-    read -p "请输入 Nezha 服务端地址 (例如: server.example.com:5555): " NZ_SERVER
-    if [ -z "$NZ_SERVER" ]; then
-        error "服务端地址不能为空"
-        exit 1
+    if [ -z "${NZ_SERVER:-}" ]; then
+        read -p "请输入 Nezha 服务端地址 (例如: server.example.com:5555): " NZ_SERVER
+        if [ -z "$NZ_SERVER" ]; then
+            error "服务端地址不能为空"
+            exit 1
+        fi
+    else
+        info "使用环境变量中的服务端地址"
     fi
 
-    read -p "请输入客户端密钥 (Client Secret): " NZ_CLIENT_SECRET
-    if [ -z "$NZ_CLIENT_SECRET" ]; then
-        error "客户端密钥不能为空"
-        exit 1
+    if [ -z "${NZ_CLIENT_SECRET:-}" ]; then
+        read -p "请输入客户端密钥 (Client Secret): " NZ_CLIENT_SECRET
+        if [ -z "$NZ_CLIENT_SECRET" ]; then
+            error "客户端密钥不能为空"
+            exit 1
+        fi
+    else
+        info "使用环境变量中的客户端密钥"
     fi
 
-    read -p "是否启用 TLS (true/false，默认 true): " NZ_TLS
+    if [ -z "${NZ_TLS:-}" ]; then
+        read -p "是否启用 TLS (true/false，默认 true): " NZ_TLS
+    fi
     NZ_TLS=${NZ_TLS:-true}
 
     URL="https://github.com/nezhahq/agent/releases/download/v${AGENT_VERSION}/nezha-agent_${AGENT_VERSION}_linux_${ARCH}.zip"
