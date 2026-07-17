@@ -26,19 +26,19 @@ error() {
 detect_package_manager() {
     if command -v apt-get >/dev/null 2>&1; then
         PKG_MANAGER="apt-get"
-        PKG_INSTALL="install -y"
+        PKG_INSTALL=("install" "-y")
     elif command -v yum >/dev/null 2>&1; then
         PKG_MANAGER="yum"
-        PKG_INSTALL="install -y"
+        PKG_INSTALL=("install" "-y")
     elif command -v dnf >/dev/null 2>&1; then
         PKG_MANAGER="dnf"
-        PKG_INSTALL="install -y"
+        PKG_INSTALL=("install" "-y")
     elif command -v apk >/dev/null 2>&1; then
         PKG_MANAGER="apk"
-        PKG_INSTALL="add"
+        PKG_INSTALL=("add")
     elif command -v zypper >/dev/null 2>&1; then
         PKG_MANAGER="zypper"
-        PKG_INSTALL="install -y"
+        PKG_INSTALL=("install" "-y")
     else
         error "不支持的包管理器，请手动安装依赖"
         exit 1
@@ -59,7 +59,7 @@ install_dependencies() {
 
     info "检测到缺少依赖: ${missing_deps[*]}"
     info "正在自动安装依赖..."
-    ${SUDO} "$PKG_MANAGER" "$PKG_INSTALL" "${missing_deps[@]}"
+    ${SUDO} "$PKG_MANAGER" "${PKG_INSTALL[@]}" "${missing_deps[@]}"
 }
 
 get_sudo() {
