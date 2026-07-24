@@ -146,6 +146,12 @@ wait_for_apt_locks() {
     return 0
 }
 
+repair_dpkg_state() {
+    warn "检测到 dpkg 状态被中断，正在执行 dpkg --configure -a 修复..."
+    wait_for_apt_locks || return 1
+    ${SUDO} env DEBIAN_FRONTEND=noninteractive dpkg --configure -a
+}
+
 apt_install_with_lock_wait() {
     local log_file
 
@@ -153,16 +159,24 @@ apt_install_with_lock_wait() {
     wait_for_apt_locks || return 1
 
     log_file="$(mktemp)"
-    if ${SUDO} apt-get -o DPkg::Lock::Timeout="$APT_LOCK_TIMEOUT" install -y "$@" 2>&1 | tee "$log_file"; then
+    if ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout="$APT_LOCK_TIMEOUT" install -y "$@" 2>&1 | tee "$log_file"; then
         rm -f "$log_file"
         return 0
+    fi
+
+    if grep -Eiq "dpkg was interrupted|dpkg --configure -a" "$log_file"; then
+        warn "apt 提示 dpkg 配置未完成，修复后重试安装依赖..."
+        rm -f "$log_file"
+        repair_dpkg_state || return 1
+        ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout="$APT_LOCK_TIMEOUT" install -y "$@"
+        return
     fi
 
     if grep -Eiq "Could not get lock|Unable to acquire.*lock|held by process" "$log_file"; then
         warn "apt/dpkg 锁仍被占用，等待释放后重试安装依赖..."
         rm -f "$log_file"
         wait_for_apt_locks || return 1
-        ${SUDO} apt-get -o DPkg::Lock::Timeout="$APT_LOCK_TIMEOUT" install -y "$@"
+        ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout="$APT_LOCK_TIMEOUT" install -y "$@"
         return
     fi
 

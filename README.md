@@ -88,6 +88,7 @@ systemctl enable nezha-agent
 
 ### 2026-07-25
 
+- 增加 dpkg 中断状态自愈，遇到 `dpkg was interrupted` 时自动执行 `dpkg --configure -a` 后重试依赖安装。
 - 增加脚本版本标识 `SCRIPT_VERSION=2026.07.25.2`，便于确认是否拉取到最新脚本。
 - 增加显式 apt/dpkg 锁检测和重试，避免旧系统不支持 apt 锁等待参数时依赖安装中断。
 - 增加 apt/dpkg 锁等待能力，遇到 `unattended-upgr` 等系统自动更新占用锁时会等待释放后继续安装依赖。
