@@ -82,6 +82,13 @@ systemctl enable nezha-agent
 - `arm64` (aarch64)
 - `armv7` (armv7l)
 
+## 更新日志
+
+### 2026-07-25
+
+- 增强 Debian/Ubuntu 依赖安装自愈能力：当 `apt-get update` 发现没有 Release 文件的失效软件源时，自动备份并禁用对应 `.list` / `.sources` 源后重试更新。
+- 修复 Debian/Ubuntu 系统中失效 apt 软件源导致依赖安装中断的问题。现在 `apt-get update` 失败时会提示警告，并继续尝试安装缺少的依赖。
+
 ## 许可证
 
 MIT License

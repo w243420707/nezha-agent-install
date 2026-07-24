@@ -23,6 +23,89 @@ error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+disable_apt_suite_sources() {
+    local suite="$1"
+    local changed=1
+    local backup_suffix
+    backup_suffix="$(date +%Y%m%d%H%M%S)"
+
+    for source_file in /etc/apt/sources.list /etc/apt/sources.list.d/*.list; do
+        [ -f "$source_file" ] || continue
+        if ${SUDO} grep -Eq "^[[:space:]]*deb(-src)?[[:space:]].*[[:space:]]${suite}([[:space:]]|$)" "$source_file"; then
+            warn "检测到失效软件源 ${suite}: ${source_file}，正在备份并禁用..."
+            ${SUDO} cp "$source_file" "${source_file}.bak.${backup_suffix}"
+            ${SUDO} sed -i -E "/^[[:space:]]*deb(-src)?[[:space:]].*[[:space:]]${suite}([[:space:]]|$)/ s/^/# disabled by nezha-agent installer: /" "$source_file"
+            changed=0
+        fi
+    done
+
+    for source_file in /etc/apt/sources.list.d/*.sources; do
+        [ -f "$source_file" ] || continue
+        if ${SUDO} grep -Eq "^[[:space:]]*Suites:[[:space:]].*(^|[[:space:]])${suite}([[:space:]]|$)" "$source_file"; then
+            warn "检测到失效软件源 ${suite}: ${source_file}，正在备份并禁用..."
+            ${SUDO} cp "$source_file" "${source_file}.bak.${backup_suffix}"
+            ${SUDO} sed -i -E "/^[[:space:]]*Enabled:/ s/Enabled:.*/Enabled: no/" "$source_file"
+            if ! ${SUDO} grep -Eq "^[[:space:]]*Enabled:" "$source_file"; then
+                printf '\nEnabled: no\n' | ${SUDO} tee -a "$source_file" >/dev/null
+            fi
+            changed=0
+        fi
+    done
+
+    return "$changed"
+}
+
+heal_apt_sources() {
+    local log_file="$1"
+    local healed=1
+    local suites
+
+    suites="$(
+        sed -nE \
+            -e "s/^E: The repository '.* ([^ ]+) Release'.*no longer has a Release file\\./\\1/p" \
+            -e "s/^E: The repository '.* ([^ ]+) Release'.*does not have a Release file\\./\\1/p" \
+            -e "s/^Err:[0-9]+ .* ([^ ]+) Release$/\\1/p" \
+            "$log_file" | sort -u
+    )"
+
+    if [ -z "$suites" ]; then
+        return 1
+    fi
+
+    while IFS= read -r suite; do
+        [ -n "$suite" ] || continue
+        if disable_apt_suite_sources "$suite"; then
+            healed=0
+        fi
+    done <<EOF
+$suites
+EOF
+
+    return "$healed"
+}
+
+apt_update_with_self_heal() {
+    local log_file
+    log_file="$(mktemp)"
+
+    if ${SUDO} apt-get update 2>&1 | tee "$log_file"; then
+        rm -f "$log_file"
+        return 0
+    fi
+
+    warn "apt-get update 失败，正在尝试自动修复失效软件源..."
+
+    if heal_apt_sources "$log_file"; then
+        warn "已禁用失效 apt 软件源，重新更新软件包索引..."
+        rm -f "$log_file"
+        ${SUDO} apt-get update
+        return
+    fi
+
+    rm -f "$log_file"
+    return 1
+}
+
 install_dependencies() {
     local missing_deps=()
     for dep in "$@"; do
@@ -39,7 +122,13 @@ install_dependencies() {
     info "正在自动安装依赖..."
 
     if command -v apt-get >/dev/null 2>&1; then
-        ${SUDO} apt-get update && ${SUDO} apt-get install -y "${missing_deps[@]}"
+        if ! apt_update_with_self_heal; then
+            warn "apt-get update 仍然失败，继续尝试使用现有软件包索引安装依赖..."
+        fi
+        if ! ${SUDO} apt-get install -y "${missing_deps[@]}"; then
+            error "依赖安装失败，请检查 /etc/apt/sources.list 或 /etc/apt/sources.list.d/ 中的失效软件源后重试"
+            exit 1
+        fi
     elif command -v dnf >/dev/null 2>&1; then
         ${SUDO} dnf install -y "${missing_deps[@]}"
     elif command -v yum >/dev/null 2>&1; then
