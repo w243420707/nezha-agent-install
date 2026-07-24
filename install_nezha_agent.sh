@@ -5,6 +5,7 @@ set -euo pipefail
 AGENT_VERSION="${AGENT_VERSION:-v2.2.3}"
 AGENT_DIR="/opt/nezha/agent"
 NZ_TLS="${NZ_TLS:-true}"
+APT_LOCK_TIMEOUT="${APT_LOCK_TIMEOUT:-300}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -88,7 +89,7 @@ apt_update_with_self_heal() {
     local log_file
     log_file="$(mktemp)"
 
-    if ${SUDO} apt-get update 2>&1 | tee "$log_file"; then
+    if ${SUDO} apt-get -o DPkg::Lock::Timeout="$APT_LOCK_TIMEOUT" update 2>&1 | tee "$log_file"; then
         rm -f "$log_file"
         return 0
     fi
@@ -98,12 +99,17 @@ apt_update_with_self_heal() {
     if heal_apt_sources "$log_file"; then
         warn "已禁用失效 apt 软件源，重新更新软件包索引..."
         rm -f "$log_file"
-        ${SUDO} apt-get update
+        ${SUDO} apt-get -o DPkg::Lock::Timeout="$APT_LOCK_TIMEOUT" update
         return
     fi
 
     rm -f "$log_file"
     return 1
+}
+
+apt_install_with_lock_wait() {
+    info "apt/dpkg 如被其他进程占用，将最多等待 ${APT_LOCK_TIMEOUT} 秒..."
+    ${SUDO} apt-get -o DPkg::Lock::Timeout="$APT_LOCK_TIMEOUT" install -y "$@"
 }
 
 install_dependencies() {
@@ -125,8 +131,8 @@ install_dependencies() {
         if ! apt_update_with_self_heal; then
             warn "apt-get update 仍然失败，继续尝试使用现有软件包索引安装依赖..."
         fi
-        if ! ${SUDO} apt-get install -y "${missing_deps[@]}"; then
-            error "依赖安装失败，请检查 /etc/apt/sources.list 或 /etc/apt/sources.list.d/ 中的失效软件源后重试"
+        if ! apt_install_with_lock_wait "${missing_deps[@]}"; then
+            error "依赖安装失败，请检查 apt 软件源、网络连接，或等待系统自动更新完成后重试"
             exit 1
         fi
     elif command -v dnf >/dev/null 2>&1; then
