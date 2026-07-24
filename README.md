@@ -41,6 +41,7 @@ NZ_SERVER="your-server:5555" NZ_CLIENT_SECRET="your-secret" NZ_TLS="true" ./inst
 | `NZ_SERVER` | **是** | 无 | Nezha 服务端地址（如: `server.example.com:5555`） |
 | `NZ_CLIENT_SECRET` | **是** | 无 | 客户端密钥 |
 | `NZ_TLS` | 否 | `true` | 是否启用 TLS |
+| `SCRIPT_VERSION` | 否 | `2026.07.25.2` | 脚本版本标识 |
 | `AGENT_VERSION` | 否 | `v2.2.3` | Agent 版本 |
 | `APT_LOCK_TIMEOUT` | 否 | `300` | apt/dpkg 锁等待秒数 |
 
@@ -87,6 +88,8 @@ systemctl enable nezha-agent
 
 ### 2026-07-25
 
+- 增加脚本版本标识 `SCRIPT_VERSION=2026.07.25.2`，便于确认是否拉取到最新脚本。
+- 增加显式 apt/dpkg 锁检测和重试，避免旧系统不支持 apt 锁等待参数时依赖安装中断。
 - 增加 apt/dpkg 锁等待能力，遇到 `unattended-upgr` 等系统自动更新占用锁时会等待释放后继续安装依赖。
 - 增强 Debian/Ubuntu 依赖安装自愈能力：当 `apt-get update` 发现没有 Release 文件的失效软件源时，自动备份并禁用对应 `.list` / `.sources` 源后重试更新。
 - 修复 Debian/Ubuntu 系统中失效 apt 软件源导致依赖安装中断的问题。现在 `apt-get update` 失败时会提示警告，并继续尝试安装缺少的依赖。

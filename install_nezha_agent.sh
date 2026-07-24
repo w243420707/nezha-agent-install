@@ -2,6 +2,7 @@
 
 set -euo pipefail
 
+SCRIPT_VERSION="${SCRIPT_VERSION:-2026.07.25.2}"
 AGENT_VERSION="${AGENT_VERSION:-v2.2.3}"
 AGENT_DIR="/opt/nezha/agent"
 NZ_TLS="${NZ_TLS:-true}"
@@ -107,9 +108,66 @@ apt_update_with_self_heal() {
     return 1
 }
 
+is_apt_locked() {
+    local lock_file
+    local pids
+
+    if ! command -v fuser >/dev/null 2>&1; then
+        return 1
+    fi
+
+    for lock_file in /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock; do
+        [ -e "$lock_file" ] || continue
+        pids="$(${SUDO} fuser "$lock_file" 2>/dev/null || true)"
+        if [ -n "$pids" ]; then
+            warn "apt/dpkg 锁被占用: ${lock_file}，占用进程: ${pids}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+wait_for_apt_locks() {
+    local waited=0
+    local interval=5
+
+    while is_apt_locked; do
+        if [ "$waited" -ge "$APT_LOCK_TIMEOUT" ]; then
+            error "等待 apt/dpkg 锁释放超时 (${APT_LOCK_TIMEOUT} 秒)"
+            return 1
+        fi
+
+        warn "系统正在执行 apt/dpkg 操作，等待 ${interval} 秒后重试..."
+        sleep "$interval"
+        waited=$((waited + interval))
+    done
+
+    return 0
+}
+
 apt_install_with_lock_wait() {
+    local log_file
+
     info "apt/dpkg 如被其他进程占用，将最多等待 ${APT_LOCK_TIMEOUT} 秒..."
-    ${SUDO} apt-get -o DPkg::Lock::Timeout="$APT_LOCK_TIMEOUT" install -y "$@"
+    wait_for_apt_locks || return 1
+
+    log_file="$(mktemp)"
+    if ${SUDO} apt-get -o DPkg::Lock::Timeout="$APT_LOCK_TIMEOUT" install -y "$@" 2>&1 | tee "$log_file"; then
+        rm -f "$log_file"
+        return 0
+    fi
+
+    if grep -Eiq "Could not get lock|Unable to acquire.*lock|held by process" "$log_file"; then
+        warn "apt/dpkg 锁仍被占用，等待释放后重试安装依赖..."
+        rm -f "$log_file"
+        wait_for_apt_locks || return 1
+        ${SUDO} apt-get -o DPkg::Lock::Timeout="$APT_LOCK_TIMEOUT" install -y "$@"
+        return
+    fi
+
+    rm -f "$log_file"
+    return 1
 }
 
 install_dependencies() {
@@ -176,7 +234,8 @@ detect_arch() {
 main() {
     echo "========================================="
     echo "      Nezha Agent 一键安装脚本"
-    echo "      版本: ${AGENT_VERSION}"
+    echo "      脚本版本: ${SCRIPT_VERSION}"
+    echo "      Agent 版本: ${AGENT_VERSION}"
     echo "========================================="
 
     info "获取权限..."
